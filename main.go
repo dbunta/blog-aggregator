@@ -31,6 +31,7 @@ func main() {
 	cmds.handlers = make(map[string]func(*state, command) error)
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handlerRegister)
+	cmds.register("reset", handlerReset)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -47,10 +48,6 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	//c.SetUser("lane")
-	//c, err = config.Read()
-	//fmt.Print(c)
 }
 
 type state struct {
@@ -129,5 +126,14 @@ func handlerRegister(s *state, cmd command) error {
 	}
 	fmt.Printf("new user %v was created\n", newUser.Name)
 	fmt.Printf("new user info: %v\n", newUser)
+	return nil
+}
+
+func handlerReset(s *state, cmd command) error {
+	err := s.db.TruncateUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("reset error: error truncating users table: %w", err)
+	}
+	fmt.Printf("users table successfully reset\n")
 	return nil
 }
