@@ -32,6 +32,7 @@ func main() {
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handlerRegister)
 	cmds.register("reset", handlerReset)
+	cmds.register("users", handlerGetUsers)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -135,5 +136,21 @@ func handlerReset(s *state, cmd command) error {
 		return fmt.Errorf("reset error: error truncating users table: %w", err)
 	}
 	fmt.Printf("users table successfully reset\n")
+	return nil
+}
+
+func handlerGetUsers(s *state, cmd command) error {
+	users, err := s.db.GetUsers(context.Background())
+	if err != nil {
+		return fmt.Errorf("get users error: error getting users: %w", err)
+	}
+
+	for i := 0; i < len(users); i++ {
+		fmt.Printf("* %v", users[i].Name)
+		if s.config.CurrentUserName == users[i].Name {
+			fmt.Printf(" (current)")
+		}
+		fmt.Printf("\n")
+	}
 	return nil
 }
