@@ -39,6 +39,7 @@ func main() {
 	cmds.register("users", handlerGetUsers)
 	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", handlerAddFeed)
+	cmds.register("feeds", handlerFeeds)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -85,6 +86,12 @@ type RSSItem struct {
 	Link        string `xml:"link"`
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
+}
+
+type feed struct {
+	name      string `json:"name"`
+	url       string `json:"url"`
+	user_name string `json:"user_name"`
 }
 
 func (c *commands) run(s *state, cmd command) error {
@@ -246,6 +253,19 @@ func handlerAddFeed(s *state, cmd command) error {
 	}
 
 	fmt.Printf("%v", feed)
+
+	return nil
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	feeds, err := s.db.GetFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("get feeds error: %v", err)
+	}
+
+	for _, v := range feeds {
+		fmt.Printf("%v\n", v)
+	}
 
 	return nil
 }
