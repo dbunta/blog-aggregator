@@ -40,6 +40,8 @@ func main() {
 	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", handlerAddFeed)
 	cmds.register("feeds", handlerFeeds)
+	cmds.register("follow", handlerFollow)
+	cmds.register("following", handlerGetFeedFollows)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -252,6 +254,18 @@ func handlerAddFeed(s *state, cmd command) error {
 		return fmt.Errorf("add feed error: %v", err)
 	}
 
+	followParams := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	}
+	_, err = s.db.CreateFeedFollow(context.Background(), followParams)
+	if err != nil {
+		return fmt.Errorf("follows error: %w", err)
+	}
+
 	fmt.Printf("%v", feed)
 
 	return nil
@@ -262,10 +276,55 @@ func handlerFeeds(s *state, cmd command) error {
 	if err != nil {
 		return fmt.Errorf("get feeds error: %v", err)
 	}
-
 	for _, v := range feeds {
 		fmt.Printf("%v\n", v)
 	}
+	return nil
+}
 
+func handlerFollow(s *state, cmd command) error {
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("follows error: url not provided")
+	}
+
+	user, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("follows error: %w", err)
+	}
+
+	feed, err := s.db.GetFeed(context.Background(), cmd.args[0])
+	if err != nil {
+		return fmt.Errorf("follows error: %w", err)
+	}
+
+	params := database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	}
+	ff, err := s.db.CreateFeedFollow(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("follows error: %w", err)
+	}
+	fmt.Printf("%v is now following %v", ff.UserName, ff.FeedName)
+	return nil
+}
+
+func handlerGetFeedFollows(s *state, cmd command) error {
+	user, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
+	if err != nil {
+		return fmt.Errorf("get feeds error: %w", err)
+	}
+
+	feeds, err := s.db.GetFeedFollows(context.Background(), user.ID)
+	if err != nil {
+		return fmt.Errorf("get feeds error: %w", err)
+	}
+
+	for _, f := range feeds {
+		fmt.Printf("%v\n", f.FeedName)
+	}
 	return nil
 }
