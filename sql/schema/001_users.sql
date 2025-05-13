@@ -5,6 +5,5 @@ CREATE TABLE users (
   updated_at TIMESTAMP NOT NULL,
   name VARCHAR UNIQUE NOT NULL
 );
-
 -- +goose Down
 DROP TABLE users;

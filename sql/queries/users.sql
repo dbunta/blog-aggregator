@@ -12,7 +12,7 @@ RETURNING *;
 SELECT * FROM users WHERE name = $1;
 
 -- name: TruncateUsers :exec
-TRUNCATE TABLE users;
+DELETE FROM users;
 
 -- name: GetUsers :many
 SELECT * FROM users;
