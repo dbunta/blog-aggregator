@@ -42,6 +42,7 @@ func main() {
 	cmds.register("feeds", handlerFeeds)
 	cmds.register("follow", middlewareLoggedIn(handlerFollow))
 	cmds.register("following", middlewareLoggedIn(handlerGetFeedFollows))
+	cmds.register("unfollow", middlewareLoggedIn(handlerUnfollow))
 
 	args := os.Args
 	if len(args) < 2 {
@@ -327,13 +328,6 @@ func handlerFollow(s *state, cmd command, user database.User) error {
 }
 
 func handlerGetFeedFollows(s *state, cmd command, user database.User) error {
-	/*
-		user, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
-		if err != nil {
-			return fmt.Errorf("get feeds error: %w", err)
-		}
-	*/
-
 	feeds, err := s.db.GetFeedFollows(context.Background(), user.ID)
 	if err != nil {
 		return fmt.Errorf("get feeds error: %w", err)
@@ -342,5 +336,21 @@ func handlerGetFeedFollows(s *state, cmd command, user database.User) error {
 	for _, f := range feeds {
 		fmt.Printf("%v\n", f.FeedName)
 	}
+	return nil
+}
+
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("unfollow error: feed url required")
+	}
+	params := database.DeleteFeedFollowsParams{
+		Name: user.Name,
+		Url:  cmd.args[0],
+	}
+	err := s.db.DeleteFeedFollows(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("unfollow error: %w", err)
+	}
+	fmt.Printf("%v unfollowed feed: %v\n", user.Name, cmd.args[0])
 	return nil
 }
