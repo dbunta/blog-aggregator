@@ -198,11 +198,24 @@ func handlerGetUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	res, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
-	if err != nil {
-		return err
+	if len(cmd.args) < 1 {
+		return fmt.Errorf("agg error: no time between reqs was provided")
 	}
-	fmt.Printf("%v", res)
+
+	timeBetweenReqs, err := time.ParseDuration(cmd.args[0])
+	if err != nil {
+		return fmt.Errorf("agg error: %w", err)
+	}
+
+	ticker := time.NewTicker(timeBetweenReqs)
+	for ; ; <-ticker.C {
+		fmt.Printf("Collecting feeds every %s\n", timeBetweenReqs)
+		err = scrapeFeeds(s, cmd)
+		if err != nil {
+			return fmt.Errorf("agg error: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -245,13 +258,6 @@ func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		return fmt.Errorf("add feed error: name and url must be provided")
 	}
-
-	/*
-		user, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
-		if err != nil {
-			return fmt.Errorf("add feed error: user does not exist")
-		}
-	*/
 
 	params := database.CreateFeedParams{
 		ID:        uuid.New(),
@@ -300,13 +306,6 @@ func handlerFollow(s *state, cmd command, user database.User) error {
 		return fmt.Errorf("follows error: url not provided")
 	}
 
-	/*
-		user, err := s.db.GetUser(context.Background(), s.config.CurrentUserName)
-		if err != nil {
-			return fmt.Errorf("follows error: %w", err)
-		}
-	*/
-
 	feed, err := s.db.GetFeed(context.Background(), cmd.args[0])
 	if err != nil {
 		return fmt.Errorf("follows error: %w", err)
@@ -352,5 +351,28 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 		return fmt.Errorf("unfollow error: %w", err)
 	}
 	fmt.Printf("%v unfollowed feed: %v\n", user.Name, cmd.args[0])
+	return nil
+}
+
+func scrapeFeeds(s *state, cmd command) error {
+	feed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		return fmt.Errorf("scrape feeds error: %w", err)
+	}
+
+	params := database.MarkFeedFetchedParams{
+		LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		ID:            feed.ID,
+	}
+	err = s.db.MarkFeedFetched(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("scrape feeds error: %w", err)
+	}
+
+	rssFeed, err := fetchFeed(context.Background(), feed.Url)
+	fmt.Printf("%v\n", rssFeed.Channel.Title)
+	for _, val := range rssFeed.Channel.Item {
+		fmt.Printf("%v\n", val.Title)
+	}
 	return nil
 }
