@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	config "github.com/dbunta/blog-aggregator/internal/config"
@@ -43,6 +45,7 @@ func main() {
 	cmds.register("follow", middlewareLoggedIn(handlerFollow))
 	cmds.register("following", middlewareLoggedIn(handlerGetFeedFollows))
 	cmds.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	cmds.register("browse", handlerBrowse)
 
 	args := os.Args
 	if len(args) < 2 {
@@ -369,10 +372,58 @@ func scrapeFeeds(s *state, cmd command) error {
 		return fmt.Errorf("scrape feeds error: %w", err)
 	}
 
-	rssFeed, err := fetchFeed(context.Background(), feed.Url)
-	fmt.Printf("%v\n", rssFeed.Channel.Title)
-	for _, val := range rssFeed.Channel.Item {
+	rss, err := fetchFeed(context.Background(), feed.Url)
+	if err != nil {
+		return fmt.Errorf("scrape feeds error: %w", err)
+	}
+
+	fmt.Printf("%v\n", rss.Channel.Title)
+	for _, val := range rss.Channel.Item {
+		pubDate, err := time.Parse("Mon, 2 Jan 2006 15:04:05 -0700", val.PubDate)
+		if err != nil {
+			return fmt.Errorf("scrape feeds error: %w", err)
+		}
+		params := database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       val.Title,
+			Url:         val.Link,
+			Description: val.Description,
+			PublishedAt: pubDate,
+			FeedID:      feed.ID,
+		}
+		_, err = s.db.CreatePost(context.Background(), params)
+		if err != nil && !strings.Contains(err.Error(), "duplicate key value violates unique constraint \"posts_url_key\"") {
+			return fmt.Errorf("scrape feeds error: %w", err)
+		}
 		fmt.Printf("%v\n", val.Title)
+	}
+	return nil
+}
+
+func handlerBrowse(s *state, cmd command) error {
+	var limit int64 = 2
+	if len(cmd.args) > 0 {
+		parsedLimit, err := strconv.ParseInt(cmd.args[0], 10, 32)
+		if err != nil {
+			return fmt.Errorf("browse error: %w", err)
+		}
+		limit = parsedLimit
+	}
+	params := database.GetPostsForUserParams{
+		Name:  s.config.CurrentUserName,
+		Limit: int32(limit),
+	}
+	posts, err := s.db.GetPostsForUser(context.Background(), params)
+	if err != nil {
+		return fmt.Errorf("browse error: %w", err)
+	}
+
+	for _, post := range posts {
+		fmt.Printf("-----------------------------------------------------------\n")
+		fmt.Printf("%v\n", post)
+		fmt.Printf("-----------------------------------------------------------\n")
 	}
 	return nil
 }
